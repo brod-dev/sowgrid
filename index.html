@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sowgrid — square-foot garden bed planner</title>
+<style>
+  :root{
+    --surface:#f6f3ec; --surface-2:#efeae0; --panel:#fffdf8;
+    --ink:#2c2a26; --ink-soft:#6b665c; --ink-faint:#9a9488;
+    --line:#e0d9ca; --line-strong:#cfc6b3;
+    --primary:#3f6b4f; --primary-soft:#e4ede4; --primary-ink:#2c503b;
+    --accent:#c06a3f;
+    /* functional category palette */
+    --cat-leafy:#6f8f4e; --cat-root:#c98a3c; --cat-nightshade:#b0503f;
+    --cat-legume:#4f8a7b; --cat-allium:#8a6aa0; --cat-herb:#8c8033;
+    --cat-brassica:#5f7d9a; --cat-cucurbit:#a8863f; --cat-fruit:#b6577a;
+    --radius:10px; --shadow:0 1px 2px rgba(44,42,38,.06),0 6px 20px rgba(44,42,38,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--surface); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+  }
+  .ui{font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header.top{
+    display:flex; align-items:center; gap:14px;
+    padding:18px 28px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  header.top .logo{width:40px;height:40px;flex:0 0 auto}
+  header.top h1{font-size:22px;margin:0;letter-spacing:.2px}
+  header.top .tag{font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:12.5px;color:var(--ink-soft);margin-left:2px}
+  header.top .spacer{flex:1}
+  .btn{
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:13px; font-weight:600; cursor:pointer;
+    border:1px solid var(--line-strong); background:var(--panel); color:var(--ink);
+    padding:8px 13px; border-radius:8px; transition:.15s;
+  }
+  .btn:hover{border-color:var(--primary);color:var(--primary-ink)}
+  .btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.primary:hover{background:#365d44}
+
+  main{display:grid;grid-template-columns:238px 1fr 288px;gap:0;min-height:calc(100vh - 77px)}
+  .col{padding:20px}
+  .palette{border-right:1px solid var(--line);background:var(--surface-2)}
+  .summary{border-left:1px solid var(--line);background:var(--surface-2)}
+  .stage{display:flex;flex-direction:column;align-items:center;gap:18px;padding-top:26px}
+
+  .col h2{font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-faint);margin:0 0 12px}
+
+  /* palette list */
+  .plant{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    padding:7px 9px;border-radius:8px;border:1px solid transparent;background:none;
+    cursor:pointer;font-family:inherit;font-size:15px;color:var(--ink);transition:.12s;
+  }
+  .plant:hover{background:var(--panel)}
+  .plant:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+  .plant.sel{background:var(--panel);border-color:var(--line-strong);box-shadow:var(--shadow)}
+  .plant .sw{width:16px;height:16px;border-radius:4px;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+  .plant .nm{flex:1;line-height:1.15}
+  .plant .per{font-family:ui-sans-serif,sans-serif;font-size:11px;color:var(--ink-faint);
+    background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:1px 7px}
+  .plant.sel .per{background:var(--surface-2)}
+  .plant .key{font-family:ui-monospace,monospace;font-size:10px;color:var(--ink-faint);width:12px;text-align:center}
+  .erase.sel{background:#f3e7df;border-color:#e3c9b8}
+
+  /* bed controls */
+  .bedctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-family:ui-sans-serif,sans-serif;font-size:13px;color:var(--ink-soft)}
+  .bedctl label{display:flex;align-items:center;gap:6px}
+  .step{display:inline-flex;align-items:center;border:1px solid var(--line-strong);
+    border-radius:8px;overflow:hidden;background:var(--panel)}
+  .step button{border:none;background:none;width:28px;height:30px;cursor:pointer;
+    font-size:16px;color:var(--ink-soft);font-family:inherit}
+  .step button:hover{background:var(--surface-2);color:var(--primary-ink)}
+  .step .val{min-width:26px;text-align:center;font-weight:600;color:var(--ink);font-size:14px}
+
+  /* the bed */
+  .bedwrap{background:var(--panel);border-radius:14px;padding:16px;box-shadow:var(--shadow);
+    border:1px solid var(--line)}
+  .bed{display:grid;gap:5px;background:#d9c3a0;padding:8px;border-radius:8px}
+  .cell{
+    position:relative;aspect-ratio:1/1;min-width:44px;border-radius:6px;cursor:pointer;
+    background:#fbf8f1;border:1px solid #e7dcc6;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;transition:.1s;overflow:hidden;
+  }
+  .cell:hover{border-color:var(--primary);transform:translateY(-1px)}
+  .cell:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+  .cell.filled{border-color:rgba(0,0,0,.12)}
+  .cell .ab{font-family:ui-sans-serif,sans-serif;font-weight:700;font-size:13px;
+    letter-spacing:.02em;line-height:1;z-index:1}
+  .cell .ct{font-family:ui-sans-serif,sans-serif;font-size:10px;margin-top:2px;
+    opacity:.85;z-index:1}
+  .cell .dots{position:absolute;inset:0;display:grid;place-content:center;opacity:.14;padding:6px}
+  .cell .dots i{background:currentColor;border-radius:50%;display:block}
+
+  /* summary panel */
+  .stat{display:flex;align-items:baseline;justify-content:space-between;
+    padding:9px 0;border-bottom:1px dashed var(--line)}
+  .stat .k{font-family:ui-sans-serif,sans-serif;font-size:13px;color:var(--ink-soft)}
+  .stat .v{font-size:20px;font-weight:600;color:var(--primary-ink)}
+  .plist{margin:14px 0 0;padding:0;list-style:none}
+  .plist li{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:14px}
+  .plist .sw{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+  .plist .nm{flex:1}
+  .plist .n{font-family:ui-sans-serif,sans-serif;font-size:12.5px;color:var(--ink-soft)}
+  .plist .n b{color:var(--ink);font-size:14px}
+  .empty{color:var(--ink-faint);font-size:14px;text-align:center;padding:24px 8px;line-height:1.6}
+  .empty .icon{width:34px;height:34px;margin:0 auto 8px;opacity:.5}
+
+  .legend{margin-top:18px;display:flex;flex-wrap:wrap;gap:6px 12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;
+    font-family:ui-sans-serif,sans-serif;font-size:11.5px;color:var(--ink-soft)}
+  .legend i{width:11px;height:11px;border-radius:3px}
+
+  .hint{font-family:ui-sans-serif,sans-serif;font-size:12px;color:var(--ink-faint);
+    text-align:center;max-width:520px}
+  .tips{font-family:ui-sans-serif,sans-serif;font-size:12.5px;color:var(--ink-soft);
+    background:var(--primary-soft);border-radius:8px;padding:10px 12px;margin-top:16px;line-height:1.5}
+  .tips b{color:var(--primary-ink)}
+
+  @media (max-width:900px){
+    main{grid-template-columns:1fr}
+    .palette,.summary{border:none;border-bottom:1px solid var(--line)}
+  }
+  @media print{
+    header .btn,.palette{display:none}
+    main{grid-template-columns:1fr 300px}
+    body{background:#fff}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <svg class="logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-label="sowgrid logo">
+    <rect x="4" y="4" width="56" height="56" rx="12" fill="#3f6b4f"/>
+    <g stroke="#e4ede4" stroke-width="2.4" stroke-linecap="round" opacity="0.55">
+      <line x1="16" y1="26" x2="48" y2="26"/><line x1="16" y1="38" x2="48" y2="38"/>
+      <line x1="26" y1="16" x2="26" y2="48"/><line x1="38" y1="16" x2="38" y2="48"/></g>
+    <rect x="16" y="16" width="10" height="10" rx="2" fill="#c06a3f"/>
+    <rect x="38" y="38" width="10" height="10" rx="2" fill="#c98a3c"/>
+    <path d="M32 46 V32" stroke="#f6f3ec" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M32 34 C27 34 24 30 24.5 25 C29.5 25 32 29 32 34 Z" fill="#f6f3ec"/>
+    <path d="M32 30 C36 30 39 26.5 38.6 22.5 C34 22.5 32 26 32 30 Z" fill="#e4ede4"/>
+  </svg>
+  <div>
+    <h1>sowgrid</h1>
+    <div class="tag">Plan your raised bed, square by square.</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="clearBtn">Clear bed</button>
+  <button class="btn" id="copyBtn">Copy plant list</button>
+  <button class="btn primary" id="printBtn">Print plan</button>
+</header>
+
+<main>
+  <aside class="col palette ui">
+    <h2>Plants</h2>
+    <div id="plantList"></div>
+    <button class="plant erase" id="eraseBtn" data-erase>
+      <span class="sw" style="background:repeating-linear-gradient(45deg,#e9ddd2,#e9ddd2 3px,#f6f3ec 3px,#f6f3ec 6px)"></span>
+      <span class="nm">Erase</span><span class="key">E</span>
+    </button>
+    <div class="legend" id="legend"></div>
+  </aside>
+
+  <section class="col stage">
+    <div class="bedctl ui">
+      <label>Bed width
+        <span class="step"><button id="wMinus" aria-label="narrower">–</button>
+        <span class="val" id="wVal">4</span><button id="wPlus" aria-label="wider">+</button></span> ft
+      </label>
+      <label>Bed length
+        <span class="step"><button id="hMinus" aria-label="shorter">–</button>
+        <span class="val" id="hVal">6</span><button id="hPlus" aria-label="longer">+</button></span> ft
+      </label>
+    </div>
+    <div class="bedwrap"><div class="bed" id="bed"></div></div>
+    <p class="hint">Pick a plant, then click squares to sow. Each square is one square foot. Numbers 1–9 select plants; press <b>E</b> to erase.</p>
+  </section>
+
+  <aside class="col summary ui">
+    <h2>Planting plan</h2>
+    <div class="stat"><span class="k">Bed size</span><span class="v" id="sSize">—</span></div>
+    <div class="stat"><span class="k">Squares planted</span><span class="v" id="sSquares">0</span></div>
+    <div class="stat"><span class="k">Total plants</span><span class="v" id="sTotal">0</span></div>
+    <ul class="plist" id="plantSummary"></ul>
+    <div id="emptyState" class="empty">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#3f6b4f" stroke-width="1.5"><path d="M12 20V11M12 11c0-3-2-5-5-5 0 3 2 5 5 5Zm0-1c0-2.5 2-4 4.5-4 0 2.5-2 4-4.5 4Z"/></svg>
+      Your bed is empty.<br>Choose a plant and start sowing.
+    </div>
+    <div class="tips" id="tips" style="display:none"></div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+var PLANTS = [
+  {id:"tomato",   name:"Tomato",    ab:"To", cat:"nightshade", per:1},
+  {id:"pepper",   name:"Pepper",    ab:"Pe", cat:"nightshade", per:1},
+  {id:"lettuce",  name:"Lettuce",   ab:"Le", cat:"leafy",      per:4},
+  {id:"spinach",  name:"Spinach",   ab:"Sp", cat:"leafy",      per:9},
+  {id:"carrot",   name:"Carrot",    ab:"Ca", cat:"root",       per:16},
+  {id:"beet",     name:"Beet",      ab:"Be", cat:"root",       per:9},
+  {id:"bean",     name:"Bush bean", ab:"Bn", cat:"legume",     per:9},
+  {id:"pea",      name:"Pea",       ab:"Pa", cat:"legume",     per:8},
+  {id:"onion",    name:"Onion",     ab:"On", cat:"allium",     per:9},
+  {id:"garlic",   name:"Garlic",    ab:"Ga", cat:"allium",     per:9},
+  {id:"basil",    name:"Basil",     ab:"Ba", cat:"herb",       per:4},
+  {id:"broccoli", name:"Broccoli",  ab:"Br", cat:"brassica",   per:1},
+  {id:"cucumber", name:"Cucumber",  ab:"Cu", cat:"cucurbit",   per:2},
+  {id:"strawberry",name:"Strawberry",ab:"St",cat:"fruit",      per:4}
+];
+var CATS = {
+  nightshade:{label:"Nightshade", c:"var(--cat-nightshade)"},
+  leafy:{label:"Leafy green", c:"var(--cat-leafy)"},
+  root:{label:"Root", c:"var(--cat-root)"},
+  legume:{label:"Legume", c:"var(--cat-legume)"},
+  allium:{label:"Allium", c:"var(--cat-allium)"},
+  herb:{label:"Herb", c:"var(--cat-herb)"},
+  brassica:{label:"Brassica", c:"var(--cat-brassica)"},
+  cucurbit:{label:"Cucurbit", c:"var(--cat-cucurbit)"},
+  fruit:{label:"Fruit", c:"var(--cat-fruit)"}
+};
+var TIPS = {
+  nightshade:"Nightshades love heat and steady water. Keep tomatoes away from potatoes to reduce blight.",
+  legume:"Beans and peas fix nitrogen — great neighbors for leafy greens and brassicas.",
+  allium:"Onions and garlic help deter pests; plant them near carrots and lettuce.",
+  brassica:"Brassicas are heavy feeders. Give them room and rotate yearly to avoid clubroot.",
+  root:"Sow roots directly and thin early — crowded carrots stay small.",
+  leafy:"Leafy greens bolt in heat. Tuck them beside taller plants for afternoon shade.",
+  herb:"Basil planted near tomatoes is a classic pairing that saves bed space.",
+  cucurbit:"Cucurbits sprawl — train cucumbers up a trellis to reclaim squares.",
+  fruit:"Strawberries spread by runners; give the border rows to your everbearing types."
+};
+var CATCOLOR = {}; // resolved rgb from css vars
+var cols=4, rows=6, MIN=2, MAXW=8, MAXH=10;
+var grid=[];              // grid[r][c] = plantId or null
+var selected = PLANTS[0].id;
+var el = function(id){return document.getElementById(id);};
+
+function resolveColors(){
+  var probe=document.createElement("div");document.body.appendChild(probe);
+  for(var k in CATS){probe.style.color=CATS[k].c;CATCOLOR[k]=getComputedStyle(probe).color;}
+  document.body.removeChild(probe);
+}
+function plantById(id){for(var i=0;i<PLANTS.length;i++)if(PLANTS[i].id===id)return PLANTS[i];return null;}
+function tint(rgb,a){return rgb.replace("rgb(","rgba(").replace(")",", "+a+")");}
+
+function buildPalette(){
+  var host=el("plantList");host.innerHTML="";
+  PLANTS.forEach(function(p,i){
+    var b=document.createElement("button");
+    b.className="plant";b.setAttribute("data-id",p.id);
+    b.innerHTML='<span class="key">'+(i<9?(i+1):"")+'</span>'+
+      '<span class="sw" style="background:'+CATS[p.cat].c+'"></span>'+
+      '<span class="nm">'+p.name+'</span>'+
+      '<span class="per">'+p.per+'/sq</span>';
+    b.onclick=function(){selected=p.id;render();};
+    host.appendChild(b);
+  });
+  el("eraseBtn").onclick=function(){selected="__erase";render();};
+  var lg=el("legend");lg.innerHTML="";
+  var seen={};PLANTS.forEach(function(p){
+    if(seen[p.cat])return;seen[p.cat]=1;
+    var s=document.createElement("span");
+    s.innerHTML='<i style="background:'+CATS[p.cat].c+'"></i>'+CATS[p.cat].label;
+    lg.appendChild(s);
+  });
+}
+function ensureGrid(){
+  var g=[];for(var r=0;r<rows;r++){g[r]=[];for(var c=0;c<cols;c++){
+    g[r][c]=(grid[r]&&grid[r][c]!==undefined)?grid[r][c]:null;}}grid=g;
+}
+function dotsFor(per){
+  // small representative dot grid
+  var n=Math.min(per,16),side=Math.ceil(Math.sqrt(n));
+  var sz=side>=4?4:(side===3?6:8);
+  var html='<div class="dots" style="grid-template-columns:repeat('+side+',1fr);gap:'+(side>=4?2:3)+'px">';
+  for(var i=0;i<n;i++)html+='<i style="width:'+sz+'px;height:'+sz+'px"></i>';
+  return html+'</div>';
+}
+function buildBed(){
+  ensureGrid();
+  var bed=el("bed");
+  bed.style.gridTemplateColumns="repeat("+cols+",1fr)";
+  bed.style.gridTemplateRows="repeat("+rows+",1fr)";
+  bed.innerHTML="";
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    (function(r,c){
+      var id=grid[r][c],cell=document.createElement("button");
+      cell.className="cell";cell.setAttribute("aria-label","row "+(r+1)+" column "+(c+1));
+      if(id){var p=plantById(id),col=CATCOLOR[p.cat];
+        cell.classList.add("filled");
+        cell.style.background=tint(col,0.16);
+        cell.style.color=col;
+        cell.innerHTML=dotsFor(p.per)+'<span class="ab" style="color:'+col+'">'+p.ab+'</span>'+
+          '<span class="ct">'+p.per+'</span>';
+      }
+      cell.onclick=function(){
+        grid[r][c]=(selected==="__erase")?null:selected;
+        buildBed();updateSummary();
+      };
+      bed.appendChild(cell);
+    })(r,c);
+  }
+}
+function updateSummary(){
+  var counts={},sq=0,tot=0,cats={};
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){var id=grid[r][c];if(id){
+    counts[id]=(counts[id]||0)+1;sq++;var p=plantById(id);tot+=p.per;
+    cats[p.cat]=(cats[p.cat]||0)+1;}}
+  el("sSize").textContent=cols+"×"+rows+" ft";
+  el("sSquares").textContent=sq;
+  el("sTotal").textContent=tot;
+  var ul=el("plantSummary");ul.innerHTML="";
+  var ids=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];});
+  ids.forEach(function(id){var p=plantById(id),s=counts[id];
+    var li=document.createElement("li");
+    li.innerHTML='<span class="sw" style="background:'+CATS[p.cat].c+'"></span>'+
+      '<span class="nm">'+p.name+'</span>'+
+      '<span class="n"><b>'+(s*p.per)+'</b> plants · '+s+' sq</span>';
+    ul.appendChild(li);
+  });
+  el("emptyState").style.display=sq?"none":"block";
+  ul.style.display=sq?"block":"none";
+  // dominant-category tip
+  var tips=el("tips");
+  if(sq){var best=null,bn=-1;for(var k in cats)if(cats[k]>bn){bn=cats[k];best=k;}
+    tips.style.display="block";
+    tips.innerHTML='<b>'+CATS[best].label+' tip.</b> '+TIPS[best];
+  } else tips.style.display="none";
+}
+function render(){
+  document.querySelectorAll(".plant").forEach(function(b){
+    var id=b.getAttribute("data-id");
+    b.classList.toggle("sel", id? id===selected : selected==="__erase");
+  });
+  el("wVal").textContent=cols;el("hVal").textContent=rows;
+  buildBed();updateSummary();
+}
+function copyList(){
+  var lines=["sowgrid — planting plan ("+cols+"×"+rows+" ft)",""];
+  var counts={};for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){var id=grid[r][c];if(id)counts[id]=(counts[id]||0)+1;}
+  var ids=Object.keys(counts);
+  if(!ids.length){lines.push("(empty bed)");}
+  ids.forEach(function(id){var p=plantById(id),s=counts[id];
+    lines.push("- "+p.name+": "+(s*p.per)+" plants across "+s+" square(s)");});
+  var txt=lines.join("\n");
+  var done=function(){var b=el("copyBtn"),t=b.textContent;b.textContent="Copied!";setTimeout(function(){b.textContent=t;},1400);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,function(){fallbackCopy(txt);done();});}
+  else{fallbackCopy(txt);done();}
+}
+function fallbackCopy(t){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(a);}
+
+function bindControls(){
+  el("wPlus").onclick=function(){if(cols<MAXW){cols++;render();}};
+  el("wMinus").onclick=function(){if(cols>MIN){cols--;render();}};
+  el("hPlus").onclick=function(){if(rows<MAXH){rows++;render();}};
+  el("hMinus").onclick=function(){if(rows>MIN){rows--;render();}};
+  el("clearBtn").onclick=function(){grid=[];render();};
+  el("copyBtn").onclick=copyList;
+  el("printBtn").onclick=function(){window.print();};
+  document.addEventListener("keydown",function(e){
+    if(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName))return;
+    if(e.key>="1"&&e.key<="9"){var i=+e.key-1;if(PLANTS[i]){selected=PLANTS[i].id;render();}}
+    else if(e.key==="e"||e.key==="E"){selected="__erase";render();}
+  });
+}
+function seedDemo(){ // pre-fill a tidy sample layout for first paint
+  var demo=[
+    ["tomato","tomato","basil","basil"],
+    ["tomato","tomato","basil","basil"],
+    ["pepper","pepper","lettuce","lettuce"],
+    ["carrot","carrot","beet","onion"],
+    ["bean","bean","pea","pea"],
+    ["strawberry","strawberry","spinach","spinach"]
+  ];
+  grid=[];for(var r=0;r<rows;r++){grid[r]=[];for(var c=0;c<cols;c++)grid[r][c]=(demo[r]&&demo[r][c])||null;}
+}
+resolveColors();buildPalette();bindControls();seedDemo();render();
+</script>
+</body>
+</html>
